@@ -26,7 +26,7 @@ export async function checkEmployeeId(employeeId: number) {
 
 export async function checkApiKey(apiKey: any) {
   const company = await companyRepository.findByApiKey(apiKey);
-  if (!company) throw { message: 'api key is not valid or company does not have an api key', status: 401 };
+  if (!company) throw { message: 'api key is not valid or this company does not have an api key', status: 401 };
 }
 
 export async function checkIfEmployeeHasCardOfThisType(cardType: TransactionTypes, employeeId: number) {
