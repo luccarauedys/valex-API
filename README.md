@@ -36,7 +36,8 @@ $ npm run dev
         "cardType": "education"
     }
 
-OBSERVAÇÃO: cardType só pode assumir os valores 'groceries', 'restaurant', 'transport', 'education' ou 'health'.
+OBSERVAÇÃO: cardType só pode assumir os valores 'groceries', 'restaurant',
+'transport', 'education' ou 'health'.
 
 - POST /card/activation
     - Rota para ativar um cartão.
