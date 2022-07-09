@@ -1,6 +1,7 @@
 import * as cardRepository from '../repositories/cardRepository.js';
 import * as employeeRepository from '../repositories/employeeRepository.js';
 import * as companyRepository from '../repositories/companyRepository.js';
+import { format, add, compareAsc } from 'date-fns';
 import { faker } from '@faker-js/faker';
 import Cryptr from 'cryptr';
 import dotenv from 'dotenv';
@@ -11,7 +12,7 @@ const cryptr = new Cryptr(process.env.SECRET_KEY);
 type TransactionTypes = 'groceries' | 'restaurant' | 'transport' | 'education' | 'health';
 
 export function checkCardType(cardType: TransactionTypes) {
-  const validTypes = ['groceries', 'restaurants', 'transport', 'education', 'health'];
+  const validTypes = ['groceries', 'restaurant', 'transport', 'education', 'health'];
   if (!validTypes.includes(cardType)) throw { message: 'card type is not valid', status: 400 };
 }
 
@@ -36,8 +37,6 @@ export function generateCard(employeeName: string) {
   const cardholderName = generateCardholderName(employeeName);
   const expirationDate = generateExpirationDate();
   const encryptedCVC = generateCardCVC();
-
-  console.log('Infos geradas:', { cardNumber, cardholderName, expirationDate, encryptedCVC });
   return { cardNumber, cardholderName, expirationDate, encryptedCVC };
 }
 
@@ -64,13 +63,9 @@ export function generateCardholderName(employeeName: string) {
 }
 
 export function generateExpirationDate() {
-  const currentDate = new Date().toLocaleDateString('pt-br');
-
-  const currentMonth = currentDate.split('/')[1];
-  const currentYear = currentDate.split('/')[2];
-
-  const expirationDate = `${currentMonth}/${(+currentYear + 5).toString().slice(-2)}`;
-  return expirationDate;
+  const currentDate = new Date();
+  const expirationDate = add(currentDate, { years: 5 });
+  return expirationDate.toString();
 }
 
 export function generateCardCVC() {
@@ -89,16 +84,33 @@ export async function createCard(cardType: TransactionTypes, employeeId: number,
   await checkIfEmployeeHasCardOfThisType(cardType, employeeId);
 
   const { cardNumber, cardholderName, expirationDate, encryptedCVC } = generateCard(fullName);
-  const cardData = { employeeId, number: cardNumber, cardholderName, securityCode: encryptedCVC, expirationDate, isVirtual: false, isBlocked: false, type: cardType };
 
-  return await cardRepository.insert(cardData);
+  const decryptedCVC = cryptr.decrypt(encryptedCVC);
+
+  const cardData = { employeeId, number: cardNumber, cardholderName, securityCode: encryptedCVC, expirationDate, isVirtual: false, isBlocked: false, type: cardType };
+  await cardRepository.insert(cardData);
+
+  return { cardholderName, cardNumber, expirationDate: format(new Date(expirationDate), 'MM/yy'), securityCode: decryptedCVC, cardType };
 }
 
-/* 
+export async function activateCard(cardId: string, cardCVC: string, newPassword: string) {
+  await checkIfCardCanBeActivate(Number(cardId), cardCVC);
+  const encryptedPassword = cryptr.encrypt(newPassword);
+  await cardRepository.update(Number(cardId), { password: encryptedPassword });
+}
 
-TODO: DÚVIDAS
+export async function checkIfCardCanBeActivate(cardId: number, cardCVC: string) {
+  const card = await cardRepository.findById(cardId);
+  if (!card) throw { message: 'card does not exist', status: 404 };
 
-1. O cartão deve iniciar bloqueado e ser desbloqueado no ato da ativação e criação de senha?
-2. Como saber se o cartão é virtual? Assumo que não?
+  if (card.password) throw { message: 'card is already activated', status: 422 };
 
-*/
+  const { expirationDate } = card;
+  const cardExpirationDate = new Date(expirationDate);
+  const currentDate = new Date();
+  if (compareAsc(cardExpirationDate, currentDate) !== 1) throw { message: 'card is expired', status: 422 };
+
+  const encryptedCVC = card.securityCode;
+  const decryptedCVC = cryptr.decrypt(encryptedCVC);
+  if (cardCVC !== decryptedCVC) throw { message: "card's security code is not valid", status: 401 };
+}
