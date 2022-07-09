@@ -1,6 +1,8 @@
 import * as cardRepository from '../repositories/cardRepository.js';
 import * as employeeRepository from '../repositories/employeeRepository.js';
 import * as companyRepository from '../repositories/companyRepository.js';
+import * as rechargeRepository from '../repositories/rechargeRepository.js';
+import * as paymentRepository from '../repositories/paymentRepository.js';
 import { format, add, compareAsc } from 'date-fns';
 import { faker } from '@faker-js/faker';
 import Cryptr from 'cryptr';
@@ -99,9 +101,14 @@ export async function activateCard(cardId: string, cardCVC: string, newPassword:
   await cardRepository.update(Number(cardId), { password: encryptedPassword });
 }
 
-export async function checkIfCardCanBeActivate(cardId: number, cardCVC: string) {
+export async function checkIfCardExists(cardId: number) {
   const card = await cardRepository.findById(cardId);
   if (!card) throw { message: 'card does not exist', status: 404 };
+  return card;
+}
+
+export async function checkIfCardCanBeActivate(cardId: number, cardCVC: string) {
+  const card = await checkIfCardExists(cardId);
 
   if (card.password) throw { message: 'card is already activated', status: 422 };
 
@@ -113,4 +120,39 @@ export async function checkIfCardCanBeActivate(cardId: number, cardCVC: string) 
   const encryptedCVC = card.securityCode;
   const decryptedCVC = cryptr.decrypt(encryptedCVC);
   if (cardCVC !== decryptedCVC) throw { message: "card's security code is not valid", status: 401 };
+}
+
+export async function getCardRecharges(cardId: number) {
+  return await rechargeRepository.findByCardId(cardId);
+}
+
+export async function getCardPayments(cardId: number) {
+  return await paymentRepository.findByCardId(cardId);
+}
+
+export function getCardBalance(recharges: rechargeRepository.Recharge[], transactions: paymentRepository.Payment[]) {
+  const rechargesSum = recharges
+    .map((recharge) => recharge.amount)
+    .reduce((sum, amount) => {
+      return sum + amount;
+    }, 0);
+
+  const transactionsSum = transactions
+    .map((transaction) => transaction.amount)
+    .reduce((sum, amount) => {
+      return sum + amount;
+    }, 0);
+
+  const balance = rechargesSum - transactionsSum;
+  return balance;
+}
+
+export async function getCardFinancialInfos(cardId: number) {
+  await checkIfCardExists(cardId);
+
+  const recharges: rechargeRepository.Recharge[] = await getCardRecharges(cardId);
+  const transactions: paymentRepository.Payment[] = await getCardPayments(cardId);
+  const balance = getCardBalance(recharges, transactions);
+
+  return { balance, transactions, recharges };
 }

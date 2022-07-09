@@ -22,3 +22,13 @@ export async function activateCard(req: Request, res: Response) {
   await cardService.activateCard(cardId, cardCVC, newPassword);
   res.sendStatus(201);
 }
+
+export async function getCardFinancialInfos(req: Request, res: Response) {
+  const { cardId }: { cardId: string } = req.body;
+  const cardFinancialInfos = await cardService.getCardFinancialInfos(Number(cardId));
+  res.status(200).send(cardFinancialInfos);
+}
+
+export async function lockCard(req: Request, res: Response) {}
+
+export async function unlockCard(req: Request, res: Response) {}
