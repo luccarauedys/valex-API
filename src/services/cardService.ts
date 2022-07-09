@@ -107,19 +107,38 @@ export async function checkIfCardExists(cardId: number) {
   return card;
 }
 
-export async function checkIfCardCanBeActivate(cardId: number, cardCVC: string) {
-  const card = await checkIfCardExists(cardId);
-
-  if (card.password) throw { message: 'card is already activated', status: 422 };
-
+export async function checkCardExpiration(card: cardRepository.Card) {
   const { expirationDate } = card;
   const cardExpirationDate = new Date(expirationDate);
   const currentDate = new Date();
   if (compareAsc(cardExpirationDate, currentDate) !== 1) throw { message: 'card is expired', status: 422 };
+}
 
+export async function checkIfCardIsLocked(card: cardRepository.Card) {
+  if (card.isBlocked) throw { message: 'card is already locked', status: 422 };
+}
+
+export async function checkIfCardIsUnlocked(card: cardRepository.Card) {
+  if (!card.isBlocked) throw { message: 'card is already unlocked', status: 422 };
+}
+
+export async function checkIfCardCVCMatches(cardCVC: string, card: cardRepository.Card) {
   const encryptedCVC = card.securityCode;
   const decryptedCVC = cryptr.decrypt(encryptedCVC);
-  if (cardCVC !== decryptedCVC) throw { message: "card's security code is not valid", status: 401 };
+  if (cardCVC !== decryptedCVC) throw { message: 'security code is not valid', status: 401 };
+}
+
+export async function checkIfCardPasswordMatches(cardPwd: string, card: cardRepository.Card) {
+  const encryptedPwd = card.password;
+  const decryptedPwd = cryptr.decrypt(encryptedPwd);
+  if (cardPwd !== decryptedPwd) throw { message: 'password is not valid', status: 401 };
+}
+
+export async function checkIfCardCanBeActivate(cardId: number, cardCVC: string) {
+  const card = await checkIfCardExists(cardId);
+  if (card.password) throw { message: 'card is already activated', status: 422 };
+  await checkCardExpiration(card);
+  await checkIfCardCVCMatches(cardCVC, card);
 }
 
 export async function getCardRecharges(cardId: number) {
@@ -149,10 +168,24 @@ export function getCardBalance(recharges: rechargeRepository.Recharge[], transac
 
 export async function getCardFinancialInfos(cardId: number) {
   await checkIfCardExists(cardId);
-
   const recharges: rechargeRepository.Recharge[] = await getCardRecharges(cardId);
   const transactions: paymentRepository.Payment[] = await getCardPayments(cardId);
   const balance = getCardBalance(recharges, transactions);
-
   return { balance, transactions, recharges };
+}
+
+export async function lockCard(cardId: number, cardPassword: string) {
+  const card = await checkIfCardExists(cardId);
+  await checkCardExpiration(card);
+  await checkIfCardIsLocked(card);
+  await checkIfCardPasswordMatches(cardPassword, card);
+  return await cardRepository.update(cardId, { isBlocked: true });
+}
+
+export async function unlockCard(cardId: number, cardPassword: string) {
+  const card = await checkIfCardExists(cardId);
+  await checkCardExpiration(card);
+  await checkIfCardIsUnlocked(card);
+  await checkIfCardPasswordMatches(cardPassword, card);
+  return await cardRepository.update(cardId, { isBlocked: false });
 }

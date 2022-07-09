@@ -29,6 +29,14 @@ export async function getCardFinancialInfos(req: Request, res: Response) {
   res.status(200).send(cardFinancialInfos);
 }
 
-export async function lockCard(req: Request, res: Response) {}
+export async function lockCard(req: Request, res: Response) {
+  const { cardId, cardPassword }: { cardId: string; cardPassword: string } = req.body;
+  await cardService.lockCard(Number(cardId), cardPassword);
+  res.sendStatus(200);
+}
 
-export async function unlockCard(req: Request, res: Response) {}
+export async function unlockCard(req: Request, res: Response) {
+  const { cardId, cardPassword }: { cardId: string; cardPassword: string } = req.body;
+  await cardService.unlockCard(Number(cardId), cardPassword);
+  res.sendStatus(200);
+}
