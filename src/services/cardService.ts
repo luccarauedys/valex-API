@@ -55,7 +55,7 @@ export function generateCardholderName(employeeName: string) {
   let middleNames = '';
   for (let name of splittedName) {
     if (name.length >= 3) {
-      middleNames += name + ' ';
+      middleNames += name[0] + ' ';
     }
   }
 
