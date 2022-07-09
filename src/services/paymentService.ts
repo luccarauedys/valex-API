@@ -16,7 +16,7 @@ export async function payment(cardId: number, cardPassword: string, businessId: 
 
   await checkBalance(cardId, amount);
 
-  await checkBusiness(cardId, card);
+  await checkBusiness(businessId, card);
 
   return await paymentRepository.insert({ cardId, businessId, amount });
 }
